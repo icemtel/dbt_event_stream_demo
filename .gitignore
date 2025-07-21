@@ -9,5 +9,7 @@ logs/
 **/*.duckdb.wal
 .user.yml
 
-**/*.md # TODO add documentaiton when ready
+# TODO add documentaiton when ready
+**/*.ipynb
+**/*.md
 
