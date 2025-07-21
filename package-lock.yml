@@ -1,0 +1,5 @@
+packages:
+  - name: dbt_synth_data
+    package: edanalytics/dbt_synth_data
+    version: 0.1.0
+sha1_hash: 64947cb1acf71f482c7b3e99e516f8a4fcde7c5f

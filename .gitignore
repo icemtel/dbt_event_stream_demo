@@ -1,0 +1,13 @@
+# dbt build artifacts
+target/
+dbt_packages/
+logs/
+.venv/
+
+# DuckDB database files
+**/*.duckdb
+**/*.duckdb.wal
+.user.yml
+
+**/*.md # TODO add documentaiton when ready
+

@@ -1,0 +1,23 @@
+name: 'event_stream_demo'
+
+config-version: 2
+
+profile: 'event_stream_demo'
+
+model-paths: ['models']
+analysis-paths: ['analysis']
+test-paths: ['tests']
+macro-paths:
+  - 'macros'
+  - 'dbt_packages/dbt_synth_data/macros'
+snapshot-paths: ['snapshots']
+
+target-path: 'target'
+clean-targets:
+  - 'target'
+  - 'dbt_packages'
+
+
+models:
+  raw:
+    materialized: table
