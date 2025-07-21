@@ -7,4 +7,4 @@ with
 {{ synth_column_foreign_key(name='post_id', model_name='raw_posts', column='post_id') }}
 {{ synth_column_string(name='metadata', min_length=1, max_length=1000) }}
 {{ synth_table(rows=500) }}
-select *, current_timestamp() as ingested_at from synth_table
+select *, current_localtimestamp() as ingested_at from synth_table
