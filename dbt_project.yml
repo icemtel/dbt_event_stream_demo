@@ -19,5 +19,5 @@ clean-targets:
 
 
 models:
-  raw:
-    materialized: table
+  event_stream_demo:
+   +materialized: table
