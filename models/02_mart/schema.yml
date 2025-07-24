@@ -1,0 +1,11 @@
+version: 2
+
+models:
+  - name: dim_users
+    description: User dimension table with SCD Type 2 implementation
+
+  - name: dim_posts
+    description: Posts dimension table with SCD Type 2 implementation
+
+  - name: fct_events
+    description: Event fact table with daily snapshots

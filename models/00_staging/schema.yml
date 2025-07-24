@@ -1,0 +1,18 @@
+version: 2
+
+models:
+  - name: stg_users
+    description: Cleaned and standardized users data from raw layer
+
+  - name: stg_posts
+    description: Cleaned and standardized posts data from raw layer
+
+  - name: stg_new_events
+    description: Cleaned and standardized events data from raw layer
+    columns:
+      - name: event_id
+        description: Primary key for events
+        tests:
+          - not_null
+          - unique
+

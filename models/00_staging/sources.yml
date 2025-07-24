@@ -1,0 +1,77 @@
+version: 2
+
+sources:
+  - name: raw
+    description: Raw data ingested from mock data generation script
+    schema: raw
+    tables:
+      - name: users
+        columns:
+          - name: user_id
+            description: Primary key for users
+            tests:
+              - unique
+              - not_null
+          - name: first_name
+            tests:
+              - not_null
+          - name: last_name
+            tests:
+              - not_null
+          - name: created_at
+            tests:
+              - not_null
+          - name: country_code
+            tests:
+              - not_null
+
+      - name: posts
+        columns:
+          - name: post_id
+            description: Primary key for posts
+            tests:
+              - unique
+              - not_null
+          - name: user_id
+            description: Foreign key to users table
+            tests:
+              - not_null
+              - relationships:
+                  to: source('raw', 'users')
+                  field: user_id
+          - name: post_text
+            tests:
+              - not_null
+          - name: created_at
+            tests:
+              - not_null
+
+      - name: events
+        columns:
+          - name: event_id
+            description: Primary key for events
+            tests:
+              - unique
+              - not_null
+          - name: user_id
+            description: Foreign key to users table
+            tests:
+              - not_null
+              - relationships:
+                  to: source('raw', 'users')
+                  field: user_id
+          - name: post_id
+            description: Foreign key to posts table
+            tests:
+              - not_null
+              - relationships:
+                  to: source('raw', 'posts')
+                  field: post_id
+          - name: event_ts
+            tests:
+              - not_null
+          - name: event_type
+            tests:
+              - not_null
+              - accepted_values:
+                  values: ['like', 'share', 'comment']

@@ -1,0 +1,11 @@
+version: 2
+
+models:
+  - name: int_users
+    description: User-level aggregations and metrics for business intelligence
+
+  - name: int_posts
+    description: Post-level aggregations and engagement metrics
+
+  - name: int_new_events
+    description: Enriched event data with user and post context for fact table consumption
