@@ -77,6 +77,28 @@ def create_tables(conn):
     """)
 
 
+def generate_post_text(fake):
+    """Generate post text with random length between 5-15 words."""
+    word_count = random.randint(5, 15)
+    return ' '.join(fake.words(word_count))
+
+def generate_user_first_name(fake):
+    """Generate a random first name."""
+    return fake.first_name()
+
+def generate_user_last_name(fake):
+    """Generate a random last name."""
+    return fake.last_name()
+
+def generate_user_country_code(fake):
+    """Generate a random country code."""
+    return fake.country_code()
+
+def generate_user_favorite_color(fake):
+    """Generate a random favorite color."""
+    return fake.safe_color_name()
+
+
 def insert_users(conn, fake, start_time, end_time, full_refresh):
     start_id = get_max_id(conn, 'raw.users', 'user_id') + 1 if not full_refresh else 1
     count = 200 if full_refresh else random.randint(50, 100)
@@ -86,13 +108,13 @@ def insert_users(conn, fake, start_time, end_time, full_refresh):
         updated_at = fake.date_time_between(start_date=created_at, end_date=end_time)
         rows.append((
             user_id,
-            fake.first_name(),
-            fake.last_name(),
+            generate_user_first_name(fake),
+            generate_user_last_name(fake),
             created_at,
             updated_at,
             None,
-            fake.country_code(),
-            fake.safe_color_name()
+            generate_user_country_code(fake),
+            generate_user_favorite_color(fake)
         ))
     conn.executemany("INSERT INTO raw.users VALUES (?, ?, ?, ?, ?, ?, ?, ?);", rows)
     print(f"Inserted {count} users (IDs {start_id}-{start_id + count - 1})")
@@ -114,7 +136,7 @@ def insert_posts(conn, fake, start_time, end_time, full_refresh):
         rows.append((
             post_id,
             user_id,
-            ' '.join(fake.words(5)),
+            generate_post_text(fake),
             created_at,
             updated_at,
             None
@@ -167,13 +189,13 @@ def update_users(conn, fake, start_time, end_time):
     for user_id in to_update:
         updates, params = [], []
         if random.choice([True, False]):
-            updates.append("first_name = ?"); params.append(fake.first_name())
+            updates.append("first_name = ?"); params.append(generate_user_first_name(fake))
         if random.choice([True, False]):
-            updates.append("last_name = ?"); params.append(fake.last_name())
+            updates.append("last_name = ?"); params.append(generate_user_last_name(fake))
         if random.choice([True, False]):
-            updates.append("country_code = ?"); params.append(fake.country_code())
+            updates.append("country_code = ?"); params.append(generate_user_country_code(fake))
         if random.choice([True, False]):
-            updates.append("favorite_color = ?"); params.append(fake.safe_color_name())
+            updates.append("favorite_color = ?"); params.append(generate_user_favorite_color(fake))
         updated_at = fake.date_time_between(start_date=start_time, end_date=end_time)
         updates.append("updated_at = ?"); params.append(updated_at)
         params.append(user_id)
@@ -191,7 +213,7 @@ def update_posts(conn, fake, start_time, end_time):
     ).fetchall()]
     to_update = random.sample(all_ids, max(1, int(len(all_ids) * UPDATE_FRACTION)))
     for post_id in to_update:
-        new_text = ' '.join(fake.words(5))
+        new_text = generate_post_text(fake)
         updated_at = fake.date_time_between(start_date=start_time, end_date=end_time)
         conn.execute(
             "UPDATE raw.posts SET post_text = ?, updated_at = ? WHERE post_id = ?;",
