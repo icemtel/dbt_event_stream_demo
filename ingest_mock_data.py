@@ -52,7 +52,8 @@ def create_tables(conn):
         created_at TIMESTAMP,
         updated_at TIMESTAMP,
         deleted_at TIMESTAMP,
-        country_code TEXT
+        country_code TEXT,
+        favorite_color TEXT
     );
     """)
     conn.execute("""
@@ -90,9 +91,10 @@ def insert_users(conn, fake, start_time, end_time, full_refresh):
             created_at,
             updated_at,
             None,
-            fake.country_code()
+            fake.country_code(),
+            fake.safe_color_name()
         ))
-    conn.executemany("INSERT INTO raw.users VALUES (?, ?, ?, ?, ?, ?, ?);", rows)
+    conn.executemany("INSERT INTO raw.users VALUES (?, ?, ?, ?, ?, ?, ?, ?);", rows)
     print(f"Inserted {count} users (IDs {start_id}-{start_id + count - 1})")
     return count
 
@@ -170,6 +172,8 @@ def update_users(conn, fake, start_time, end_time):
             updates.append("last_name = ?"); params.append(fake.last_name())
         if random.choice([True, False]):
             updates.append("country_code = ?"); params.append(fake.country_code())
+        if random.choice([True, False]):
+            updates.append("favorite_color = ?"); params.append(fake.safe_color_name())
         updated_at = fake.date_time_between(start_date=start_time, end_date=end_time)
         updates.append("updated_at = ?"); params.append(updated_at)
         params.append(user_id)
@@ -247,6 +251,7 @@ def main():
     now = datetime.now()
     start_time = datetime.combine(job_date, time.min)
     end_time = datetime.combine(job_date, time.max)
+    
     fake = Faker()
     if args.seed is not None:
         random.seed(args.seed)
