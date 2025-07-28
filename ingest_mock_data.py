@@ -140,13 +140,13 @@ def get_updatable_attributes(table):
 
 
 
-def insert_users(conn, fake, start_time, end_time, full_refresh):
+def insert_users(conn, fake, start_dt, end_dt, full_refresh):
     start_id = get_max_id(conn, 'raw.user', 'user_id') + 1 if not full_refresh else 1
-    count = 200 if full_refresh else random.randint(50, 100)
+    n_rows = 200 if full_refresh else random.randint(50, 100)
     rows = []
-    for user_id in range(start_id, start_id + count):
-        created_at = fake.date_time_between(start_date=start_time, end_date=end_time)
-        updated_at = fake.date_time_between(start_date=created_at, end_date=end_time)
+    for user_id in range(start_id, start_id + n_rows):
+        created_at = fake.date_time_between(start_date=start_dt, end_date=end_dt)
+        updated_at = fake.date_time_between(start_date=created_at, end_date=end_dt)
         rows.append((
             user_id,
             generate_user_first_name(fake),
@@ -158,22 +158,22 @@ def insert_users(conn, fake, start_time, end_time, full_refresh):
             generate_user_favorite_color(fake)
         ))
     conn.executemany("INSERT INTO raw.user VALUES (?, ?, ?, ?, ?, ?, ?, ?);", rows)
-    print(f"Inserted {count} rows in user (IDs {start_id}-{start_id + count - 1}).")
-    return count
+    print(f"Inserted {n_rows} rows in user (IDs {start_id}-{start_id + n_rows - 1}).")
+    return n_rows
 
 
-def insert_posts(conn, fake, start_time, end_time, full_refresh):
+def insert_posts(conn, fake, start_dt, end_dt, full_refresh):
     start_id = get_max_id(conn, 'raw.post', 'post_id') + 1 if not full_refresh else 1
-    count = 200 if full_refresh else random.randint(50, 100)
+    n_rows = 200 if full_refresh else random.randint(50, 100)
     user_rows = conn.execute(
         "SELECT user_id, created_at FROM raw.user WHERE deleted_at IS NULL"
     ).fetchall()
     rows = []
-    for post_id in range(start_id, start_id + count):
+    for post_id in range(start_id, start_id + n_rows):
         user_id, user_created = random.choice(user_rows)
-        lower = max(start_time, user_created)
-        created_at = fake.date_time_between(start_date=lower, end_date=end_time)
-        updated_at = fake.date_time_between(start_date=created_at, end_date=end_time)
+        lower = max(start_dt, user_created)
+        created_at = fake.date_time_between(start_date=lower, end_date=end_dt)
+        updated_at = fake.date_time_between(start_date=created_at, end_date=end_dt)
         rows.append((
             post_id,
             user_id,
@@ -183,13 +183,13 @@ def insert_posts(conn, fake, start_time, end_time, full_refresh):
             None
         ))
     conn.executemany("INSERT INTO raw.post VALUES (?, ?, ?, ?, ?, ?);", rows)
-    print(f"Inserted {count} rows in post (IDs {start_id}-{start_id + count - 1}).")
-    return count
+    print(f"Inserted {n_rows} rows in post (IDs {start_id}-{start_id + n_rows - 1}).")
+    return n_rows
 
 
-def insert_events(conn, fake, start_time, end_time, full_refresh):
+def insert_events(conn, fake, start_dt, end_dt, full_refresh):
     start_id = get_max_id(conn, 'raw.event', 'event_id') + 1 if not full_refresh else 1
-    count = 200 if full_refresh else random.randint(50, 100)
+    n_rows = 200 if full_refresh else random.randint(50, 100)
     event_types = ['like', 'share', 'comment']
     existing_events = set(conn.execute(
         "SELECT user_id, post_id, event_type FROM raw.event"
@@ -204,7 +204,7 @@ def insert_events(conn, fake, start_time, end_time, full_refresh):
     rows = []
     seen = set()
     event_id = start_id
-    while event_id < start_id + count:
+    while event_id < start_id + n_rows:
         post_id, post_created = random.choice(posts)
         user_id = random.choice(users)
         event_type = random.choice(event_types)
@@ -212,8 +212,8 @@ def insert_events(conn, fake, start_time, end_time, full_refresh):
         if unique_combination in existing_events or unique_combination in seen:
             continue
 
-        lower = max(start_time, post_created)
-        event_ts = fake.date_time_between(start_date=lower, end_date=end_time)
+        lower = max(start_dt, post_created)
+        event_ts = fake.date_time_between(start_date=lower, end_date=end_dt)
         rows.append((event_id, user_id, post_id, event_ts, event_type))
         seen.add(unique_combination)
         event_id += 1
@@ -222,7 +222,7 @@ def insert_events(conn, fake, start_time, end_time, full_refresh):
     return len(rows)
 
 
-def update_rows(conn, table, fake, start_time, end_time):
+def update_rows(conn, table, fake, start_dt, end_dt):
     updatable_attribute_generators =  get_updatable_attributes(table)
     total = count_rows(conn, table)
     n_rows = random.randint(1, 5) + int(total * UPDATE_FRACTION)
@@ -235,7 +235,7 @@ def update_rows(conn, table, fake, start_time, end_time):
         updates = [f"{label} = ?" for label, gen in picks]
         params = [gen(fake) for label, gen in picks]
 
-        updated_at = fake.date_time_between(start_date=start_time, end_date=end_time)
+        updated_at = fake.date_time_between(start_date=start_dt, end_date=end_dt)
         updates.append("updated_at = ?"); params.append(updated_at)
         params.append(id)
         conn.execute(
@@ -273,23 +273,23 @@ def main():
     last_job = get_last_job_date(conn)
     job_date = date(2100, 1, 1) if (args.full_refresh or last_job is None) else last_job + timedelta(days=1)
     now = datetime.now()
-    start_time = datetime.combine(job_date, time.min)
-    end_time = datetime.combine(job_date, time.max)
-    
+    start_dt = datetime.combine(job_date, time.min)
+    end_dt = datetime.combine(job_date, time.max)
+
     fake = Faker()
     if args.seed is not None:
         random.seed(args.seed)
         fake.seed_instance(args.seed)
 
     if not args.full_refresh:
-        updated_users = update_rows(conn, 'user', fake, start_time, end_time)
-        updated_posts = update_rows(conn, 'post',fake, start_time, end_time)
+        updated_users = update_rows(conn, 'user', fake, start_dt, end_dt)
+        updated_posts = update_rows(conn, 'post',fake, start_dt, end_dt)
     else:
         updated_users = updated_posts = 0
 
-    users_count = insert_users(conn, fake, start_time, end_time, args.full_refresh)
-    posts_count = insert_posts(conn, fake, start_time, end_time, args.full_refresh)
-    events_count = insert_events(conn, fake, start_time, end_time, args.full_refresh)
+    inserted_users = insert_users(conn, fake, start_dt, end_dt, args.full_refresh)
+    inserted_posts = insert_posts(conn, fake, start_dt, end_dt, args.full_refresh)
+    inserted_events = insert_events(conn, fake, start_dt, end_dt, args.full_refresh)
 
     if not args.full_refresh:
         deleted_users = delete_rows(conn, 'user', now)
@@ -298,9 +298,9 @@ def main():
         deleted_users = deleted_posts = 0
 
     for table_name, ins_count, upd_count, del_count in [
-        ('user', users_count, updated_users, deleted_users),
-        ('post', posts_count, updated_posts, deleted_posts),
-        ('event', events_count, 0, 0)
+        ('user', inserted_users, updated_users, deleted_users),
+        ('post', inserted_posts, updated_posts, deleted_posts),
+        ('event', inserted_events, 0, 0)
     ]:
         conn.execute(
             "INSERT INTO raw.ingestion_audit VALUES (?, ?, ?, ?, ?, ?);",
