@@ -8,7 +8,8 @@ from faker import Faker
 DB_FILE = 'event_stream_demo.duckdb'
 UPDATE_FRACTION = 0.05  # fraction of records to update
 DELETE_FRACTION = 0.01  # fraction of records to delete
-
+ACTIVE_FRACTION = 0.05  # fraction of users that views posts each day
+MAX_EVENTS_PER_USER = 10 # max views per user each day
 
 def parse_args():
     parser = argparse.ArgumentParser(
@@ -164,10 +165,19 @@ def insert_users(conn, fake, start_dt, end_dt, full_refresh):
 
 def insert_posts(conn, fake, start_dt, end_dt, full_refresh):
     start_id = get_max_id(conn, 'raw.post', 'post_id') + 1 if not full_refresh else 1
-    n_rows = 200 if full_refresh else random.randint(50, 100)
+
     user_rows = conn.execute(
-        "SELECT user_id, created_at FROM raw.user WHERE deleted_at IS NULL"
-    ).fetchall()
+            "SELECT user_id, created_at FROM raw.user WHERE deleted_at IS NULL"
+        ).fetchall()
+
+    if full_refresh:
+        n_rows = 200
+    else:
+        n_users = len(user_rows)
+        # make a random number of new posts; that scales with the number of active users
+        # keep this number high so that there are always posts to view
+        n_rows = int((1 + random.random()) * ACTIVE_FRACTION * n_users)
+
     rows = []
     for post_id in range(start_id, start_id + n_rows):
         user_id, user_created = random.choice(user_rows)
@@ -188,35 +198,64 @@ def insert_posts(conn, fake, start_dt, end_dt, full_refresh):
 
 
 def insert_events(conn, fake, start_dt, end_dt, full_refresh):
+    """
+    Insert events by mimicking user sessions.
+
+    1. Randomly select "active" users
+    2. Active users view a random number of posts.
+    3. Random portion of viewed posts is liked.
+
+    """
     start_id = get_max_id(conn, 'raw.event', 'event_id') + 1 if not full_refresh else 1
-    n_rows = 200 if full_refresh else random.randint(50, 100)
-    event_types = ['like', 'share', 'comment']
-    existing_events = set(conn.execute(
-        "SELECT user_id, post_id, event_type FROM raw.event"
-    ).fetchall())
+
     posts = conn.execute(
         "SELECT post_id, created_at FROM raw.post WHERE deleted_at IS NULL"
     ).fetchall()
-    users = [row[0] for row in conn.execute(
+    user_ids = [row[0] for row in conn.execute(
         "SELECT user_id FROM raw.user WHERE deleted_at IS NULL"
     ).fetchall()]
 
-    rows = []
-    seen = set()
-    event_id = start_id
-    while event_id < start_id + n_rows:
-        post_id, post_created = random.choice(posts)
-        user_id = random.choice(users)
-        event_type = random.choice(event_types)
-        unique_combination = (user_id, post_id, event_type)
-        if unique_combination in existing_events or unique_combination in seen:
-            continue
 
-        lower = max(start_dt, post_created)
-        event_ts = fake.date_time_between(start_date=lower, end_date=end_dt)
-        rows.append((event_id, user_id, post_id, event_ts, event_type))
-        seen.add(unique_combination)
-        event_id += 1
+    if full_refresh:
+        n_active_users = 10
+    else:
+        n_users = len(user_ids)
+        n_active_users = int(ACTIVE_FRACTION * n_users) + random.randint(1, 5)
+
+    active_user_ids = random.sample(user_ids, n_active_users)
+    rows = [] # collect rows to insert
+    event_id = start_id
+    for user_id in active_user_ids:
+
+        # draw how many posts will be viewed
+        n_posts = random.randint(1, MAX_EVENTS_PER_USER)
+        posts_sample = random.sample(posts, n_posts)
+        view_dt = fake.date_time_between(start_date=start_dt, end_date=end_dt) # session start
+        # view random posts
+
+        for post_id, post_created in posts_sample:
+            random_offset =  timedelta(seconds=random.randint(60, 900))
+            event_dt = max(view_dt, post_created) + random_offset
+            if event_dt > end_dt:
+                continue # event time is after the ingestion - do not add and go to the next user
+            rows.append((event_id, user_id, post_id, event_dt, 'view'))
+            event_id += 1
+            view_dt = event_dt
+
+            # some posts are liked
+            if random.random() > 0.9:
+                random_offset =  timedelta(seconds=random.randint(1, 180))
+                event_dt = view_dt + random_offset
+                if event_dt > end_dt:
+                    continue # event time is after the ingestion - do not add and go to the next user
+                rows.append((event_id, user_id, post_id, event_dt, 'like'))
+                event_id += 1
+
+    # TODO: remove duplicate likes
+    # In the current model, a user may hypothetically like the same post more than once,even in one session.
+    # we can deduplicate rows in this step, but the probability of this is low
+    # if the number of users and posts is high
+
     conn.executemany("INSERT INTO raw.event VALUES (?, ?, ?, ?, ?);", rows)
     print(f"Inserted {len(rows)} rows in event (IDs {start_id}-{start_id+len(rows)-1}).")
     return len(rows)
@@ -232,15 +271,16 @@ def update_rows(conn, table, fake, start_dt, end_dt):
         # randomly select the number of attributes to update and generate new values
         num_attributes_to_update = random.randint(1,  len(updatable_attribute_generators))
         picks = random.sample(updatable_attribute_generators, num_attributes_to_update)
-        updates = [f"{label} = ?" for label, gen in picks]
-        params = [gen(fake) for label, gen in picks]
+        update_templates = [f"{label} = ?" for label, gen in picks]
+        update_values = [gen(fake) for label, gen in picks]
 
         updated_at = fake.date_time_between(start_date=start_dt, end_date=end_dt)
-        updates.append("updated_at = ?"); params.append(updated_at)
-        params.append(id)
+        update_templates.append("updated_at = ?")
+        update_values.append(updated_at)
+
         conn.execute(
-            f"UPDATE raw.{table} SET {', '.join(updates)} WHERE {table}_id = ?;",
-            params
+            f"UPDATE raw.{table} SET {', '.join(update_templates)} WHERE {table}_id = {id};",
+            update_values
         )
     print(f"Updated {n_rows} rows in {table}.")
     return n_rows
