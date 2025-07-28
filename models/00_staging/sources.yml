@@ -5,7 +5,7 @@ sources:
     description: Raw data ingested from mock data generation script
     schema: raw
     tables:
-      - name: users
+      - name: user
         columns:
           - name: user_id
             description: Primary key for users
@@ -25,7 +25,7 @@ sources:
             tests:
               - not_null
 
-      - name: posts
+      - name: post
         columns:
           - name: post_id
             description: Primary key for posts
@@ -46,7 +46,7 @@ sources:
             tests:
               - not_null
 
-      - name: events
+      - name: event
         columns:
           - name: event_id
             description: Primary key for events

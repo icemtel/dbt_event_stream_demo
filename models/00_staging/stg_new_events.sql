@@ -20,6 +20,6 @@ select
         else 0
     end as is_comment,
     date(event_ts) as partition_date,
-from {{ source('raw', 'events') }}
+from {{ source('raw', 'event') }}
 -- where created_at > (select max(created_at) from {{ this }})
 -- TODO - do incremental.. but then this table has to exist in the staging layer...  for {{this }} to work..

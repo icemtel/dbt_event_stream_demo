@@ -7,4 +7,4 @@ select
     deleted_at,
     country_code,
 
-from {{ source('raw', 'users') }}
+from {{ source('raw', 'user') }}
