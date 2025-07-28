@@ -60,7 +60,7 @@ def create_tables(conn):
     conn.execute("""
     CREATE TABLE IF NOT EXISTS raw.post (
         post_id INTEGER PRIMARY KEY,
-        user_id INTEGER,
+        user_id INTEGER REFERENCES raw.user(user_id),
         post_text TEXT,
         created_at TIMESTAMP,
         updated_at TIMESTAMP,
@@ -70,8 +70,8 @@ def create_tables(conn):
     conn.execute("""
     CREATE TABLE IF NOT EXISTS raw.event (
         event_id INTEGER PRIMARY KEY,
-        user_id INTEGER,
-        post_id INTEGER,
+        user_id INTEGER REFERENCES raw.user(user_id),
+        post_id INTEGER REFERENCES raw.post(post_id),
         event_ts TIMESTAMP,
         event_type TEXT
     );
