@@ -45,7 +45,7 @@ def create_tables(conn):
     );
     """)
     conn.execute("""
-    CREATE TABLE IF NOT EXISTS raw.users (
+    CREATE TABLE IF NOT EXISTS raw.user (
         user_id INTEGER PRIMARY KEY,
         first_name TEXT,
         last_name TEXT,
@@ -57,7 +57,7 @@ def create_tables(conn):
     );
     """)
     conn.execute("""
-    CREATE TABLE IF NOT EXISTS raw.posts (
+    CREATE TABLE IF NOT EXISTS raw.post (
         post_id INTEGER PRIMARY KEY,
         user_id INTEGER,
         post_text TEXT,
@@ -67,7 +67,7 @@ def create_tables(conn):
     );
     """)
     conn.execute("""
-    CREATE TABLE IF NOT EXISTS raw.events (
+    CREATE TABLE IF NOT EXISTS raw.event (
         event_id INTEGER PRIMARY KEY,
         user_id INTEGER,
         post_id INTEGER,
@@ -77,30 +77,71 @@ def create_tables(conn):
     """)
 
 
+def fetch_random_ids(conn, table, n_rows):
+
+    return [row[0] for row in conn.execute(
+        f"""
+        SELECT {table}_id
+        FROM raw.{table}
+        WHERE deleted_at IS NULL
+        ORDER BY RANDOM()
+        LIMIT {n_rows};
+        """,
+    ).fetchall()]
+
+def count_rows(conn, table):
+    return conn.execute(
+        f"""
+        SELECT COUNT(*)
+        FROM raw.{table}
+        WHERE deleted_at IS NULL
+        """
+    ).fetchone()[0]
+
 def generate_post_text(fake):
     """Generate post text with random length between 5-15 words."""
     word_count = random.randint(5, 15)
     return ' '.join(fake.words(word_count))
 
+
 def generate_user_first_name(fake):
     """Generate a random first name."""
     return fake.first_name()
+
 
 def generate_user_last_name(fake):
     """Generate a random last name."""
     return fake.last_name()
 
+
 def generate_user_country_code(fake):
     """Generate a random country code."""
     return fake.country_code()
+
 
 def generate_user_favorite_color(fake):
     """Generate a random favorite color."""
     return fake.safe_color_name()
 
 
+def get_updatable_attributes(table):
+    """
+    Retrieves attributes that are allowed to be updated.
+    """
+    if table == 'user':
+        return     [
+        ("first_name",      generate_user_first_name),
+        ("last_name",      generate_user_last_name),
+        ("country_code",    generate_user_country_code),
+        ("favorite_color",  generate_user_favorite_color),
+    ]
+    elif table == 'post':
+        return [("post_text",  generate_post_text)]
+
+
+
 def insert_users(conn, fake, start_time, end_time, full_refresh):
-    start_id = get_max_id(conn, 'raw.users', 'user_id') + 1 if not full_refresh else 1
+    start_id = get_max_id(conn, 'raw.user', 'user_id') + 1 if not full_refresh else 1
     count = 200 if full_refresh else random.randint(50, 100)
     rows = []
     for user_id in range(start_id, start_id + count):
@@ -116,16 +157,16 @@ def insert_users(conn, fake, start_time, end_time, full_refresh):
             generate_user_country_code(fake),
             generate_user_favorite_color(fake)
         ))
-    conn.executemany("INSERT INTO raw.users VALUES (?, ?, ?, ?, ?, ?, ?, ?);", rows)
-    print(f"Inserted {count} users (IDs {start_id}-{start_id + count - 1})")
+    conn.executemany("INSERT INTO raw.user VALUES (?, ?, ?, ?, ?, ?, ?, ?);", rows)
+    print(f"Inserted {count} rows in user (IDs {start_id}-{start_id + count - 1}).")
     return count
 
 
 def insert_posts(conn, fake, start_time, end_time, full_refresh):
-    start_id = get_max_id(conn, 'raw.posts', 'post_id') + 1 if not full_refresh else 1
+    start_id = get_max_id(conn, 'raw.post', 'post_id') + 1 if not full_refresh else 1
     count = 200 if full_refresh else random.randint(50, 100)
     user_rows = conn.execute(
-        "SELECT user_id, created_at FROM raw.users WHERE deleted_at IS NULL"
+        "SELECT user_id, created_at FROM raw.user WHERE deleted_at IS NULL"
     ).fetchall()
     rows = []
     for post_id in range(start_id, start_id + count):
@@ -141,23 +182,23 @@ def insert_posts(conn, fake, start_time, end_time, full_refresh):
             updated_at,
             None
         ))
-    conn.executemany("INSERT INTO raw.posts VALUES (?, ?, ?, ?, ?, ?);", rows)
-    print(f"Inserted {count} posts (IDs {start_id}-{start_id + count - 1})")
+    conn.executemany("INSERT INTO raw.post VALUES (?, ?, ?, ?, ?, ?);", rows)
+    print(f"Inserted {count} rows in post (IDs {start_id}-{start_id + count - 1}).")
     return count
 
 
 def insert_events(conn, fake, start_time, end_time, full_refresh):
-    start_id = get_max_id(conn, 'raw.events', 'event_id') + 1 if not full_refresh else 1
+    start_id = get_max_id(conn, 'raw.event', 'event_id') + 1 if not full_refresh else 1
     count = 200 if full_refresh else random.randint(50, 100)
     event_types = ['like', 'share', 'comment']
     existing_events = set(conn.execute(
-        "SELECT user_id, post_id, event_type FROM raw.events"
+        "SELECT user_id, post_id, event_type FROM raw.event"
     ).fetchall())
     posts = conn.execute(
-        "SELECT post_id, created_at FROM raw.posts WHERE deleted_at IS NULL"
+        "SELECT post_id, created_at FROM raw.post WHERE deleted_at IS NULL"
     ).fetchall()
     users = [row[0] for row in conn.execute(
-        "SELECT user_id FROM raw.users WHERE deleted_at IS NULL"
+        "SELECT user_id FROM raw.user WHERE deleted_at IS NULL"
     ).fetchall()]
 
     rows = []
@@ -176,87 +217,48 @@ def insert_events(conn, fake, start_time, end_time, full_refresh):
         rows.append((event_id, user_id, post_id, event_ts, event_type))
         seen.add(unique_combination)
         event_id += 1
-    conn.executemany("INSERT INTO raw.events VALUES (?, ?, ?, ?, ?);", rows)
-    print(f"Inserted {len(rows)} events (IDs {start_id}-{start_id+len(rows)-1})")
+    conn.executemany("INSERT INTO raw.event VALUES (?, ?, ?, ?, ?);", rows)
+    print(f"Inserted {len(rows)} rows in event (IDs {start_id}-{start_id+len(rows)-1}).")
     return len(rows)
 
 
-def update_users(conn, fake, start_time, end_time):
-    all_ids = [row[0] for row in conn.execute(
-        "SELECT user_id FROM raw.users WHERE deleted_at IS NULL"
-    ).fetchall()]
-    to_update = random.sample(all_ids, max(1, int(len(all_ids) * UPDATE_FRACTION)))
-    for user_id in to_update:
-        updates, params = [], []
-        if random.choice([True, False]):
-            updates.append("first_name = ?"); params.append(generate_user_first_name(fake))
-        if random.choice([True, False]):
-            updates.append("last_name = ?"); params.append(generate_user_last_name(fake))
-        if random.choice([True, False]):
-            updates.append("country_code = ?"); params.append(generate_user_country_code(fake))
-        if random.choice([True, False]):
-            updates.append("favorite_color = ?"); params.append(generate_user_favorite_color(fake))
+def update_rows(conn, table, fake, start_time, end_time):
+    updatable_attribute_generators =  get_updatable_attributes(table)
+    total = count_rows(conn, table)
+    n_rows = random.randint(1, 5) + int(total * UPDATE_FRACTION)
+    ids = fetch_random_ids(conn, table, n_rows)
+
+    for id in ids:
+        # randomly select the number of attributes to update and generate new values
+        num_attributes_to_update = random.randint(1,  len(updatable_attribute_generators))
+        picks = random.sample(updatable_attribute_generators, num_attributes_to_update)
+        updates = [f"{label} = ?" for label, gen in picks]
+        params = [gen(fake) for label, gen in picks]
+
         updated_at = fake.date_time_between(start_date=start_time, end_date=end_time)
         updates.append("updated_at = ?"); params.append(updated_at)
-        params.append(user_id)
+        params.append(id)
         conn.execute(
-            f"UPDATE raw.users SET {', '.join(updates)} WHERE user_id = ?;",
+            f"UPDATE raw.{table} SET {', '.join(updates)} WHERE {table}_id = ?;",
             params
         )
-    print(f"Updated {len(to_update)} users")
-    return len(to_update)
+    print(f"Updated {n_rows} rows in {table}.")
+    return n_rows
 
 
-def update_posts(conn, fake, start_time, end_time):
-    all_ids = [row[0] for row in conn.execute(
-        "SELECT post_id FROM raw.posts WHERE deleted_at IS NULL"
-    ).fetchall()]
-    to_update = random.sample(all_ids, max(1, int(len(all_ids) * UPDATE_FRACTION)))
-    for post_id in to_update:
-        new_text = generate_post_text(fake)
-        updated_at = fake.date_time_between(start_date=start_time, end_date=end_time)
-        conn.execute(
-            "UPDATE raw.posts SET post_text = ?, updated_at = ? WHERE post_id = ?;",
-            (new_text, updated_at, post_id)
-        )
-    print(f"Updated {len(to_update)} posts")
-    return len(to_update)
+def delete_rows(conn, table, now):
+    total = count_rows(conn, table)
+    n_rows = random.randint(1, 5) + int(total * DELETE_FRACTION)
+    ids = fetch_random_ids(conn, table, n_rows)
 
-
-def delete_users(conn, now):
-    total = conn.execute(
-        "SELECT COUNT(*) FROM raw.users WHERE deleted_at IS NULL"
-    ).fetchone()[0]
-    num = max(1, int(total * DELETE_FRACTION))
-    ids = [row[0] for row in conn.execute(
-        "SELECT user_id FROM raw.users WHERE deleted_at IS NULL ORDER BY RANDOM() LIMIT ?;", (num,)
-    ).fetchall()]
-    deleted = len(ids)
     if ids:
         conn.execute(
-            "UPDATE raw.users SET deleted_at = ? WHERE user_id IN (%s);" %
+            f"UPDATE raw.{table} SET deleted_at = ? WHERE {table}_id IN (%s);" %
             ",".join(["?" for _ in ids]), [now] + ids
         )
-    print(f"Deleted {deleted} users")
-    return deleted
+    print(f"Deleted {n_rows} rows in {table}.")
+    return n_rows
 
-
-def delete_posts(conn, now):
-    total = conn.execute(
-        "SELECT COUNT(*) FROM raw.posts WHERE deleted_at IS NULL"
-    ).fetchone()[0]
-    num = max(1, int(total * DELETE_FRACTION))
-    ids = [row[0] for row in conn.execute(
-        "SELECT post_id FROM raw.posts WHERE deleted_at IS NULL ORDER BY RANDOM() LIMIT ?;", (num,)
-    ).fetchall()]
-    deleted = len(ids)
-    if ids:
-        conn.execute(
-            "UPDATE raw.posts SET deleted_at = ? WHERE post_id IN (%s);" %
-            ",".join(["?" for _ in ids]), [now] + ids
-        )
-    print(f"Deleted {deleted} posts")
-    return deleted
 
 
 def main():
@@ -280,8 +282,8 @@ def main():
         fake.seed_instance(args.seed)
 
     if not args.full_refresh:
-        updated_users = update_users(conn, fake, start_time, end_time)
-        updated_posts = update_posts(conn, fake, start_time, end_time)
+        updated_users = update_rows(conn, 'user', fake, start_time, end_time)
+        updated_posts = update_rows(conn, 'post',fake, start_time, end_time)
     else:
         updated_users = updated_posts = 0
 
@@ -290,15 +292,15 @@ def main():
     events_count = insert_events(conn, fake, start_time, end_time, args.full_refresh)
 
     if not args.full_refresh:
-        deleted_users = delete_users(conn, now)
-        deleted_posts = delete_posts(conn, now)
+        deleted_users = delete_rows(conn, 'user', now)
+        deleted_posts = delete_rows(conn, 'post', now)
     else:
         deleted_users = deleted_posts = 0
 
     for table_name, ins_count, upd_count, del_count in [
-        ('users', users_count, updated_users, deleted_users),
-        ('posts', posts_count, updated_posts, deleted_posts),
-        ('events', events_count, 0, 0)
+        ('user', users_count, updated_users, deleted_users),
+        ('post', posts_count, updated_posts, deleted_posts),
+        ('event', events_count, 0, 0)
     ]:
         conn.execute(
             "INSERT INTO raw.ingestion_audit VALUES (?, ?, ?, ?, ?, ?);",
