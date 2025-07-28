@@ -28,11 +28,6 @@ def get_last_job_date(conn):
     return None if res is None else res
 
 
-def get_max_id(conn, table, pk_col):
-    res = conn.execute(f"SELECT MAX({pk_col}) FROM {table}").fetchone()[0]
-    return res if res is not None else 0
-
-
 def create_tables(conn):
     conn.execute("CREATE SCHEMA IF NOT EXISTS raw;")
     conn.execute("""
@@ -47,7 +42,7 @@ def create_tables(conn):
     """)
     conn.execute("""
     CREATE TABLE IF NOT EXISTS raw.user (
-        user_id INTEGER PRIMARY KEY,
+        user_id VARCHAR(16) PRIMARY KEY,
         first_name TEXT,
         last_name TEXT,
         created_at TIMESTAMP,
@@ -59,8 +54,8 @@ def create_tables(conn):
     """)
     conn.execute("""
     CREATE TABLE IF NOT EXISTS raw.post (
-        post_id INTEGER PRIMARY KEY,
-        user_id INTEGER REFERENCES raw.user(user_id),
+        post_id VARCHAR(16) PRIMARY KEY,
+        user_id VARCHAR(16) REFERENCES raw.user(user_id),
         post_text TEXT,
         created_at TIMESTAMP,
         updated_at TIMESTAMP,
@@ -69,9 +64,9 @@ def create_tables(conn):
     """)
     conn.execute("""
     CREATE TABLE IF NOT EXISTS raw.event (
-        event_id INTEGER PRIMARY KEY,
-        user_id INTEGER REFERENCES raw.user(user_id),
-        post_id INTEGER REFERENCES raw.post(post_id),
+        event_id VARCHAR(16) PRIMARY KEY,
+        user_id VARCHAR(16) REFERENCES raw.user(user_id),
+        post_id VARCHAR(16) REFERENCES raw.post(post_id),
         event_ts TIMESTAMP,
         event_type TEXT
     );
@@ -90,14 +85,27 @@ def fetch_random_ids(conn, table, n_rows):
         """,
     ).fetchall()]
 
-def count_rows(conn, table):
+def count_rows(conn, table, include_deleted=False):
+    """
+    Return the number of rows in the table.
+    """
+    if include_deleted:
+        sql_where = ''
+    else:
+        sql_where = 'WHERE deleted_at IS NULL'
     return conn.execute(
         f"""
         SELECT COUNT(*)
         FROM raw.{table}
-        WHERE deleted_at IS NULL
+        {sql_where}
         """
     ).fetchone()[0]
+
+def generate_id(fake):
+    """
+    Generate a sequence of 16 random symbols to use as ID
+    """
+    return fake.pystr(16, 16)
 
 def generate_post_text(fake):
     """Generate post text with random length between 5-15 words."""
@@ -142,11 +150,15 @@ def get_updatable_attributes(table):
 
 
 def insert_users(conn, fake, start_dt, end_dt, full_refresh):
-    start_id = get_max_id(conn, 'raw.user', 'user_id') + 1 if not full_refresh else 1
     n_rows = 200 if full_refresh else random.randint(50, 100)
     rows = []
-    for user_id in range(start_id, start_id + n_rows):
-        created_at = fake.date_time_between(start_date=start_dt, end_date=end_dt)
+    # Generate and sort creation timestamps, so that we insert rows in order
+    created_at_sorted = sorted(
+        fake.date_time_between(start_date=start_dt, end_date=end_dt)
+        for _ in range(n_rows)
+    )
+    for created_at in created_at_sorted:
+        user_id = generate_id(fake)
         updated_at = fake.date_time_between(start_date=created_at, end_date=end_dt)
         rows.append((
             user_id,
@@ -158,14 +170,15 @@ def insert_users(conn, fake, start_dt, end_dt, full_refresh):
             generate_user_country_code(fake),
             generate_user_favorite_color(fake)
         ))
+
+    rows.sort(key=lambda x: x[3]) # sort by created_at
     conn.executemany("INSERT INTO raw.user VALUES (?, ?, ?, ?, ?, ?, ?, ?);", rows)
-    print(f"Inserted {n_rows} rows in user (IDs {start_id}-{start_id + n_rows - 1}).")
+    n_users = count_rows(conn, 'user', include_deleted=True)
+    print(f"Inserted {n_rows} rows in user. Total {n_users} rows.")
     return n_rows
 
 
 def insert_posts(conn, fake, start_dt, end_dt, full_refresh):
-    start_id = get_max_id(conn, 'raw.post', 'post_id') + 1 if not full_refresh else 1
-
     user_rows = conn.execute(
             "SELECT user_id, created_at FROM raw.user WHERE deleted_at IS NULL"
         ).fetchall()
@@ -174,12 +187,13 @@ def insert_posts(conn, fake, start_dt, end_dt, full_refresh):
         n_rows = 200
     else:
         n_users = len(user_rows)
-        # make a random number of new posts; that scales with the number of active users
+        # make a random number of new posts that scales with the number of active users
         # keep this number high so that there are always posts to view
         n_rows = int((1 + random.random()) * ACTIVE_FRACTION * n_users)
 
     rows = []
-    for post_id in range(start_id, start_id + n_rows):
+    for _ in range(n_rows):
+        post_id = generate_id(fake)
         user_id, user_created = random.choice(user_rows)
         lower = max(start_dt, user_created)
         created_at = fake.date_time_between(start_date=lower, end_date=end_dt)
@@ -192,8 +206,12 @@ def insert_posts(conn, fake, start_dt, end_dt, full_refresh):
             updated_at,
             None
         ))
+
+    rows.sort(key=lambda x: x[3]) # sort by created_at
     conn.executemany("INSERT INTO raw.post VALUES (?, ?, ?, ?, ?, ?);", rows)
-    print(f"Inserted {n_rows} rows in post (IDs {start_id}-{start_id + n_rows - 1}).")
+
+    n_posts = count_rows(conn, 'post', include_deleted=True)
+    print(f"Inserted {n_rows} rows in post.  Total {n_posts} rows.")
     return n_rows
 
 
@@ -206,8 +224,6 @@ def insert_events(conn, fake, start_dt, end_dt, full_refresh):
     3. Random portion of viewed posts is liked.
 
     """
-    start_id = get_max_id(conn, 'raw.event', 'event_id') + 1 if not full_refresh else 1
-
     posts = conn.execute(
         "SELECT post_id, created_at FROM raw.post WHERE deleted_at IS NULL"
     ).fetchall()
@@ -224,7 +240,6 @@ def insert_events(conn, fake, start_dt, end_dt, full_refresh):
 
     active_user_ids = random.sample(user_ids, n_active_users)
     rows = [] # collect rows to insert
-    event_id = start_id
     for user_id in active_user_ids:
 
         # draw how many posts will be viewed
@@ -238,8 +253,8 @@ def insert_events(conn, fake, start_dt, end_dt, full_refresh):
             event_dt = max(view_dt, post_created) + random_offset
             if event_dt > end_dt:
                 continue # event time is after the ingestion - do not add and go to the next user
+            event_id = generate_id(fake)
             rows.append((event_id, user_id, post_id, event_dt, 'view'))
-            event_id += 1
             view_dt = event_dt
 
             # some posts are liked
@@ -248,16 +263,19 @@ def insert_events(conn, fake, start_dt, end_dt, full_refresh):
                 event_dt = view_dt + random_offset
                 if event_dt > end_dt:
                     continue # event time is after the ingestion - do not add and go to the next user
+                event_id = generate_id(fake)
                 rows.append((event_id, user_id, post_id, event_dt, 'like'))
-                event_id += 1
 
     # TODO: remove duplicate likes
     # In the current model, a user may hypothetically like the same post more than once,even in one session.
     # we can deduplicate rows in this step, but the probability of this is low
     # if the number of users and posts is high
 
+    rows.sort(key=lambda x: x[3]) # sort by created_at
     conn.executemany("INSERT INTO raw.event VALUES (?, ?, ?, ?, ?);", rows)
-    print(f"Inserted {len(rows)} rows in event (IDs {start_id}-{start_id+len(rows)-1}).")
+
+    n_events = count_rows(conn, 'event', include_deleted=True)
+    print(f"Inserted {len(rows)} rows in event.  Total {n_events} rows.")
     return len(rows)
 
 
@@ -277,9 +295,10 @@ def update_rows(conn, table, fake, start_dt, end_dt):
         updated_at = fake.date_time_between(start_date=start_dt, end_date=end_dt)
         update_templates.append("updated_at = ?")
         update_values.append(updated_at)
+        update_values.append(id) # will be included in the WHERE statement
 
         conn.execute(
-            f"UPDATE raw.{table} SET {', '.join(update_templates)} WHERE {table}_id = {id};",
+            f"UPDATE raw.{table} SET {', '.join(update_templates)} WHERE {table}_id = ?;",
             update_values
         )
     print(f"Updated {n_rows} rows in {table}.")
@@ -291,11 +310,13 @@ def delete_rows(conn, table, now):
     n_rows = random.randint(1, 5) + int(total * DELETE_FRACTION)
     ids = fetch_random_ids(conn, table, n_rows)
 
+    # TODO generate a random deletion timestamp for each row; ensure no new related events are created after deletion
     if ids:
         conn.execute(
             f"UPDATE raw.{table} SET deleted_at = ? WHERE {table}_id IN (%s);" %
             ",".join(["?" for _ in ids]), [now] + ids
         )
+    s = f"UPDATE raw.{table} SET deleted_at = ? WHERE {table}_id IN (%s);" % ",".join(["?" for _ in ids]), [now] + ids
     print(f"Deleted {n_rows} rows in {table}.")
     return n_rows
 
