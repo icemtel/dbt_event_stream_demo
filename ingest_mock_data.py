@@ -277,6 +277,8 @@ def update_rows(conn, table, fake, start_dt, end_dt, full_refresh):
     - pick attributes to update
     - update upated_at timestamp
     - return number of rows updated
+
+    TODO: exclude posts of deleted users
     """
     if full_refresh:
         return 0
