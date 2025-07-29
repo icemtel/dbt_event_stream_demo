@@ -274,7 +274,17 @@ def insert_events(conn, fake, start_dt, end_dt, full_refresh):
     return len(rows)
 
 
-def update_rows(conn, table, fake, start_dt, end_dt):
+def update_rows(conn, table, fake, start_dt, end_dt, full_refresh):
+    """
+    Randomly updates a subset of rows in `raw.{table}`:
+    - pick rows to update
+    - pick attributes to update
+    - update upated_at timestamp
+    - return number of rows updated
+    """
+    if full_refresh:
+        return 0
+
     updatable_attribute_generators = get_updatable_attributes(table)
     total = count_rows(conn, table)
     n_rows = random.randint(1, 5) + int(total * UPDATE_FRACTION)
@@ -298,25 +308,22 @@ def update_rows(conn, table, fake, start_dt, end_dt):
     return n_rows
 
 
-def delete_rows(conn, table, fake, start_dt, end_dt):
+def delete_rows(conn, table, fake, start_dt, end_dt, full_refresh):
     """
     Randomly marks a subset of rows in `raw.{table}` as deleted by setting a deletion timestamp.
     """
+    if full_refresh:
+        return 0
+
     total = count_rows(conn, table)
     n_rows = random.randint(1, 5) + int(total * DELETE_FRACTION)
     ids = fetch_random_ids(conn, table, n_rows)
 
-    if not ids:
-        print(f"No rows to delete in {table}.")
-        return 0
-
-    rows = []
-    for row_id in ids:
-        deleted_at = fake.date_time_between(start_date=start_dt, end_date=end_dt)
-        rows.append((deleted_at, row_id))
-
-    sql = f"UPDATE raw.{table} SET deleted_at = ? WHERE {table}_id = ?;"
-    conn.executemany(sql, rows)
+    if ids:
+        rows = [(fake.date_time_between(start_date=start_dt, end_date=end_dt), row_id)
+                for row_id in ids]
+        sql = f"UPDATE raw.{table} SET deleted_at = ? WHERE {table}_id = ?;"
+        conn.executemany(sql, rows)
 
     print(f"Deleted {len(ids)} rows in {table}.")
     return len(ids)
@@ -341,14 +348,11 @@ def main():
         random.seed(args.seed)
         fake.seed_instance(args.seed)
 
-    if not args.full_refresh:
-        deleted_users = delete_rows(conn, 'user', fake, start_dt, end_dt)
-        deleted_posts = delete_rows(conn, 'post', fake, start_dt, end_dt)
-        updated_users = update_rows(conn, 'user', fake, start_dt, end_dt)
-        updated_posts = update_rows(conn, 'post', fake, start_dt, end_dt)
-    else:
-        deleted_users = deleted_posts = 0
-        updated_users = updated_posts = 0
+    deleted_users = delete_rows(conn, 'user', fake, start_dt, end_dt,  args.full_refresh)
+    deleted_posts = delete_rows(conn, 'post', fake, start_dt, end_dt,  args.full_refresh)
+
+    updated_users = update_rows(conn, 'user', fake, start_dt, end_dt,  args.full_refresh)
+    updated_posts = update_rows(conn, 'post', fake, start_dt, end_dt,  args.full_refresh)
 
     inserted_users = insert_users(conn, fake, start_dt, end_dt, args.full_refresh)
     inserted_posts = insert_posts(conn, fake, start_dt, end_dt, args.full_refresh)
