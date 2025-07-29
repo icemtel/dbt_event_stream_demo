@@ -152,14 +152,11 @@ def get_updatable_attributes(table):
 
 def insert_users(conn, fake, start_dt, end_dt, full_refresh):
     n_rows = 200 if full_refresh else random.randint(50, 100)
+
     rows = []
-    # Generate and sort creation timestamps, so that we insert rows in order
-    created_at_sorted = sorted(
-        fake.date_time_between(start_date=start_dt, end_date=end_dt)
-        for _ in range(n_rows)
-    )
-    for created_at in created_at_sorted:
+    for _ in range(n_rows):
         user_id = generate_id(fake)
+        created_at = fake.date_time_between(start_date=start_dt, end_date=end_dt)
         updated_at = fake.date_time_between(start_date=created_at, end_date=end_dt)
         rows.append((
             user_id,
@@ -221,7 +218,6 @@ def insert_events(conn, fake, start_dt, end_dt, full_refresh):
     1. Randomly select "active" users
     2. Active users view a random number of posts.
     3. Random portion of viewed posts is liked.
-
     """
 
     if full_refresh:
