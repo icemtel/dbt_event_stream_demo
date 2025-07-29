@@ -174,8 +174,7 @@ def insert_users(conn, fake, start_dt, end_dt, full_refresh):
 
     rows.sort(key=lambda x: x[3]) # sort by created_at
     conn.executemany("INSERT INTO raw.user VALUES (?, ?, ?, ?, ?, ?, ?, ?);", rows)
-    n_users = count_rows(conn, 'user', include_deleted=True)
-    print(f"Inserted {n_rows} rows in user. Total {n_users} rows.")
+    print(f"Inserted {n_rows} rows in user.")
     return n_rows
 
 
@@ -211,8 +210,7 @@ def insert_posts(conn, fake, start_dt, end_dt, full_refresh):
     rows.sort(key=lambda x: x[3]) # sort by created_at
     conn.executemany("INSERT INTO raw.post VALUES (?, ?, ?, ?, ?, ?);", rows)
 
-    n_posts = count_rows(conn, 'post', include_deleted=True)
-    print(f"Inserted {n_rows} rows in post.  Total {n_posts} rows.")
+    print(f"Inserted {n_rows} rows in post.")
     return n_rows
 
 
@@ -272,8 +270,7 @@ def insert_events(conn, fake, start_dt, end_dt, full_refresh):
     rows.sort(key=lambda x: x[3]) # sort by created_at
     conn.executemany("INSERT INTO raw.event VALUES (?, ?, ?, ?, ?);", rows)
 
-    n_events = count_rows(conn, 'event', include_deleted=True)
-    print(f"Inserted {len(rows)} rows in event.  Total {n_events} rows.")
+    print(f"Inserted {len(rows)} rows in event.")
     return len(rows)
 
 
@@ -369,6 +366,18 @@ def main():
     conn.close()
     print(f"Data ingestion for fictional date {job_date} complete.")
 
+    print("===Total table sizes===")
+    with duckdb.connect(DB_FILE) as summary_conn:
+        for table in ["user", "post"]:
+            total = count_rows(summary_conn, table, include_deleted=True)
+            active = count_rows(summary_conn, table, include_deleted=False)
+            deleted = total - active
+            print(f"{table}: {active} active rows (+ {deleted} deleted rows)")
+
+        # event table does not have deleted_at
+        table = 'event'
+        total = count_rows(summary_conn, table, include_deleted=True)
+        print(f"{table}: {total} active rows")
 
 if __name__ == '__main__':
     main()
