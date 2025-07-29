@@ -67,7 +67,7 @@ sources:
               - relationships:
                   to: source('raw', 'post')
                   field: post_id
-          - name: event_ts
+          - name: created_at
             tests:
               - not_null
           - name: event_type

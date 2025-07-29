@@ -68,7 +68,7 @@ def create_tables(conn):
         event_id VARCHAR(16) PRIMARY KEY,
         user_id VARCHAR(16) REFERENCES raw.user(user_id),
         post_id VARCHAR(16) REFERENCES raw.post(post_id),
-        event_ts TIMESTAMP,
+        created_at TIMESTAMP,
         event_type TEXT
     );
     """)
