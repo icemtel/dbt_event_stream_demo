@@ -275,7 +275,7 @@ def insert_events(conn, fake, start_dt, end_dt, full_refresh):
 
 
 def update_rows(conn, table, fake, start_dt, end_dt):
-    updatable_attribute_generators =  get_updatable_attributes(table)
+    updatable_attribute_generators = get_updatable_attributes(table)
     total = count_rows(conn, table)
     n_rows = random.randint(1, 5) + int(total * UPDATE_FRACTION)
     ids = fetch_random_ids(conn, table, n_rows)
@@ -284,18 +284,16 @@ def update_rows(conn, table, fake, start_dt, end_dt):
         # randomly select the number of attributes to update and generate new values
         num_attributes_to_update = random.randint(1,  len(updatable_attribute_generators))
         picks = random.sample(updatable_attribute_generators, num_attributes_to_update)
-        update_templates = [f"{label} = ?" for label, gen in picks]
-        update_values = [gen(fake) for label, gen in picks]
 
+        update_values = [gen(fake) for label, gen in picks]
         updated_at = fake.date_time_between(start_date=start_dt, end_date=end_dt)
-        update_templates.append("updated_at = ?")
         update_values.append(updated_at)
         update_values.append(id) # will be included in the WHERE statement
 
-        conn.execute(
-            f"UPDATE raw.{table} SET {', '.join(update_templates)} WHERE {table}_id = ?;",
-            update_values
-        )
+        update_templates = [f"{label} = ?" for label, gen in picks]
+        update_templates.append("updated_at = ?")
+        sql = f"UPDATE raw.{table} SET {', '.join(update_templates)} WHERE {table}_id = ?;"
+        conn.execute(sql, update_values)
     print(f"Updated {n_rows} rows in {table}.")
     return n_rows
 
