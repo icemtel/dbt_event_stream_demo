@@ -300,22 +300,28 @@ def update_rows(conn, table, fake, start_dt, end_dt):
     return n_rows
 
 
-def delete_rows(conn, table, now):
+def delete_rows(conn, table, fake, start_dt, end_dt):
+    """
+    Randomly marks a subset of rows in `raw.{table}` as deleted by setting a deletion timestamp.
+    """
     total = count_rows(conn, table)
     n_rows = random.randint(1, 5) + int(total * DELETE_FRACTION)
     ids = fetch_random_ids(conn, table, n_rows)
 
-    # TODO generate a random deletion timestamp for each row; ensure no new related events are created after deletion
-    if ids:
-        conn.execute(
-            f"UPDATE raw.{table} SET deleted_at = ? WHERE {table}_id IN (%s);" %
-            ",".join(["?" for _ in ids]), [now] + ids
-        )
-    s = f"UPDATE raw.{table} SET deleted_at = ? WHERE {table}_id IN (%s);" % ",".join(["?" for _ in ids]), [now] + ids
-    print(f"Deleted {n_rows} rows in {table}.")
-    return n_rows
+    if not ids:
+        print(f"No rows to delete in {table}.")
+        return 0
 
+    rows = []
+    for row_id in ids:
+        deleted_at = fake.date_time_between(start_date=start_dt, end_date=end_dt)
+        rows.append((deleted_at, row_id))
 
+    sql = f"UPDATE raw.{table} SET deleted_at = ? WHERE {table}_id = ?;"
+    conn.executemany(sql, rows)
+
+    print(f"Deleted {len(ids)} rows in {table}.")
+    return len(ids)
 
 def main():
     args = parse_args()
@@ -338,20 +344,17 @@ def main():
         fake.seed_instance(args.seed)
 
     if not args.full_refresh:
+        deleted_users = delete_rows(conn, 'user', fake, start_dt, end_dt)
+        deleted_posts = delete_rows(conn, 'post', fake, start_dt, end_dt)
         updated_users = update_rows(conn, 'user', fake, start_dt, end_dt)
-        updated_posts = update_rows(conn, 'post',fake, start_dt, end_dt)
+        updated_posts = update_rows(conn, 'post', fake, start_dt, end_dt)
     else:
+        deleted_users = deleted_posts = 0
         updated_users = updated_posts = 0
 
     inserted_users = insert_users(conn, fake, start_dt, end_dt, args.full_refresh)
     inserted_posts = insert_posts(conn, fake, start_dt, end_dt, args.full_refresh)
     inserted_events = insert_events(conn, fake, start_dt, end_dt, args.full_refresh)
-
-    if not args.full_refresh:
-        deleted_users = delete_rows(conn, 'user', now)
-        deleted_posts = delete_rows(conn, 'post', now)
-    else:
-        deleted_users = deleted_posts = 0
 
     for table_name, ins_count, upd_count, del_count in [
         ('user', inserted_users, updated_users, deleted_users),
