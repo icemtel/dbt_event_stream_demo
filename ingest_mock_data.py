@@ -10,6 +10,7 @@ UPDATE_FRACTION = 0.05  # fraction of records to update
 DELETE_FRACTION = 0.01  # fraction of records to delete
 ACTIVE_FRACTION = 0.05  # fraction of users that views posts each day
 MAX_EVENTS_PER_USER = 10 # max views per user each day
+LIKE_RATIO = 0.1
 
 def parse_args():
     parser = argparse.ArgumentParser(
@@ -224,52 +225,49 @@ def insert_events(conn, fake, start_dt, end_dt, full_refresh):
     3. Random portion of viewed posts is liked.
 
     """
-    posts = conn.execute(
-        "SELECT post_id, created_at FROM raw.post WHERE deleted_at IS NULL"
-    ).fetchall()
-    user_ids = [row[0] for row in conn.execute(
-        "SELECT user_id FROM raw.user WHERE deleted_at IS NULL"
-    ).fetchall()]
-
 
     if full_refresh:
         n_active_users = 10
     else:
-        n_users = len(user_ids)
+        n_users = count_rows(conn, 'user')
         n_active_users = int(ACTIVE_FRACTION * n_users) + random.randint(1, 5)
 
-    active_user_ids = random.sample(user_ids, n_active_users)
+    active_user_ids = fetch_random_ids(conn, 'user', n_active_users)
     rows = [] # collect rows to insert
     for user_id in active_user_ids:
 
         # draw how many posts will be viewed
         n_posts = random.randint(1, MAX_EVENTS_PER_USER)
-        posts_sample = random.sample(posts, n_posts)
-        view_dt = fake.date_time_between(start_date=start_dt, end_date=end_dt) # session start
-        # view random posts
+        session_start = fake.date_time_between(start_date=start_dt, end_date=end_dt) # session start
+        session_end = session_start + timedelta(seconds=n_posts * random.randint(60, 600))
+        session_end = min(session_end, end_dt) # make sure all events are before the ingestion date
 
-        for post_id, post_created in posts_sample:
-            random_offset =  timedelta(seconds=random.randint(60, 900))
-            event_dt = max(view_dt, post_created) + random_offset
-            if event_dt > end_dt:
-                continue # event time is after the ingestion - do not add and go to the next user
-            event_id = generate_id(fake)
-            rows.append((event_id, user_id, post_id, event_dt, 'view'))
-            view_dt = event_dt
+        # select random posts that were created before the session started
+        posts_sample = conn.execute(
+        """
+        SELECT post_id, created_at
+        FROM raw.post
+        WHERE deleted_at IS NULL and created_at < ?
+        ORDER BY RANDOM()
+        LIMIT ?
+        """, (session_start, n_posts)
+        ).fetchall()
+
+        for post_id, post_created_at in posts_sample:
+            view_dt = fake.date_time_between(max(session_start, post_created_at), session_end)
+
+            rows.append((generate_id(fake), user_id, post_id, view_dt, 'view'))
 
             # some posts are liked
-            if random.random() > 0.9:
-                random_offset =  timedelta(seconds=random.randint(1, 180))
-                event_dt = view_dt + random_offset
-                if event_dt > end_dt:
-                    continue # event time is after the ingestion - do not add and go to the next user
-                event_id = generate_id(fake)
-                rows.append((event_id, user_id, post_id, event_dt, 'like'))
+            if random.random() < LIKE_RATIO:
+                like_dt = view_dt + timedelta(seconds=random.randint(1, 300))
+
+                if like_dt < end_dt: # check that ts is before ingestion
+                    rows.append((generate_id(fake), user_id, post_id, like_dt, 'like'))
 
     # TODO: remove duplicate likes
-    # In the current model, a user may hypothetically like the same post more than once,even in one session.
-    # we can deduplicate rows in this step, but the probability of this is low
-    # if the number of users and posts is high
+    # In the current model, a user may hypothetically like the same post more than once
+    # we can deduplicate rows in this step, or we can just ensure a high number of users and posts
 
     rows.sort(key=lambda x: x[3]) # sort by created_at
     conn.executemany("INSERT INTO raw.event VALUES (?, ?, ?, ?, ?);", rows)
