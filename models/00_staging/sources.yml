@@ -37,7 +37,7 @@ sources:
             tests:
               - not_null
               - relationships:
-                  to: source('raw', 'users')
+                  to: source('raw', 'user')
                   field: user_id
           - name: post_text
             tests:
@@ -58,14 +58,14 @@ sources:
             tests:
               - not_null
               - relationships:
-                  to: source('raw', 'users')
+                  to: source('raw', 'user')
                   field: user_id
           - name: post_id
             description: Foreign key to posts table
             tests:
               - not_null
               - relationships:
-                  to: source('raw', 'posts')
+                  to: source('raw', 'post')
                   field: post_id
           - name: event_ts
             tests:
@@ -74,4 +74,4 @@ sources:
             tests:
               - not_null
               - accepted_values:
-                  values: ['like', 'share', 'comment']
+                  values: ['view', 'like']
