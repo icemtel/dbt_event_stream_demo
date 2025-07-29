@@ -7,12 +7,12 @@ models:
   - name: stg_posts
     description: Cleaned and standardized posts data from raw layer
 
-  - name: stg_new_events
+  - name: stg_events
     description: Cleaned and standardized events data from raw layer
     columns:
       - name: event_id
         description: Primary key for events
-        tests:
+        data_tests:
           - not_null
           - unique
 

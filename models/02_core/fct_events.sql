@@ -5,4 +5,4 @@
 ) }}
 
 SELECT *
-from {{ ref('int_new_events') }}
+from {{ ref('int_events') }}
