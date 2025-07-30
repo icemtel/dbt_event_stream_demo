@@ -4,6 +4,8 @@ u as ( select * from  {{ ref('int_users') }} )
 
 select
     p.* exclude (user_id),
+    -- post features
+    -- TODO: Add derived fields like post_length
     -- author info
     p.user_id as author_user_id,
     u.country_code as author_country_code,

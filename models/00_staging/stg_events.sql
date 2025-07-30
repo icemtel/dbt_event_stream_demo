@@ -19,30 +19,24 @@ To avoid that,
 ) }}
 
 {% if is_incremental() %}
-WITH
-  latest_partition AS (
-    SELECT MAX(partition_date) AS last_day
-    FROM {{ this }}
-  ),
+    with
+        latest_partition as (select max(partition_date) as last_day from {{ this }}),
 
-  max_table AS (
-    SELECT MAX(created_at) AS max_value
-    FROM {{ this }}
-    WHERE partition_date = (SELECT last_day FROM latest_partition)
-  )
-  {% endif %}
+        max_table as (
+            select max(created_at) as max_value
+            from {{ this }}
+            where partition_date = (select last_day from latest_partition)
+        )
+{% endif %}
 
-SELECT
+select
     event_id,
     user_id,
     post_id,
     created_at,
     event_type,
-    CASE WHEN event_type = 'like' THEN 1 ELSE 0 END AS is_like,
-    DATE(created_at) AS partition_date
-FROM {{ source('raw','event') }}
+    case when event_type = 'like' then 1 else 0 end as is_like,
+    date(created_at) as partition_date
+from {{ source('raw','event') }}
 
-{% if is_incremental() %}
-WHERE created_at > (SELECT max_value FROM max_table)
-{% endif %}
-
+{% if is_incremental() %} where created_at > (select max_value from max_table) {% endif %}
