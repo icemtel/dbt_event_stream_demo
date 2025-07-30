@@ -1,13 +1,13 @@
 {#
 Incremental strategy:
-in production, consider using `microbatch`.
-- supposedly efficient on large data volumes
+in production, switch to `microbatch` strategy:
 - eliminates is_incremental() logic altogether
+- supposedly efficient on large data volumes
 
 Since we're on DuckDB, we have to filter the data to ingest ourselves:
-To find the latest created_at, we want to run something like `(SELECT  MAX(created_at) - INTERVAL '15 minutes' from {{This}})`
-
-But this would scan all the partitions. To avoid that,
+To find the latest created_at, we want to run something like `SELECT  MAX(created_at)`,
+but this would scan all the partitions.
+To avoid that,
 1. Find the latest partition (partitioned by date)
 2. Find the latest timestamp in that partition
 #}
