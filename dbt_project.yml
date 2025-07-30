@@ -8,7 +8,6 @@ model-paths: ['models']
 analysis-paths: ['analysis']
 test-paths: ['tests']
 snapshot-paths: ['snapshots']
-
 target-path: 'target'
 clean-targets:
   - 'target'
@@ -17,4 +16,17 @@ clean-targets:
 
 models:
   event_stream_demo:
-   +materialized: table
+    +materialized: table
+    00_staging:
+      +schema: staging
+    01_int:
+      +schema: int
+      +materialized: "{{ 'table' if target.name == 'dev' else 'ephemeral' }}" # materialize as table in dev to catch errors where they appear; and ephemeral in production for efficiency
+    02_core:
+      +schema: analytics
+
+
+seed-paths: ['seeds']
+seeds:
+  event_stream_demo:
+    +schema: raw
