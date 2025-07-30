@@ -22,7 +22,7 @@ models:
     01_int:
       +schema: int
       +materialized: "{{ 'table' if target.name == 'dev' else 'ephemeral' }}" # materialize as table in dev to catch errors where they appear; and ephemeral in production for efficiency
-    02_core:
+    02_analytics:
       +schema: analytics
 
 
