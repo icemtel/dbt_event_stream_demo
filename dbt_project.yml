@@ -17,12 +17,14 @@ clean-targets:
 models:
   event_stream_demo:
     +materialized: table
-    00_staging:
+    00_utilities:
+      +schema: utilities
+    01_staging:
       +schema: staging
-    01_int:
+    02_int:
       +schema: int
       +materialized: "{{ 'table' if target.name == 'dev' else 'ephemeral' }}" # materialize as table in dev to catch errors where they appear; and ephemeral in production for efficiency
-    02_analytics:
+    03_analytics:
       +schema: analytics
 
 
