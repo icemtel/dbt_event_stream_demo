@@ -317,11 +317,14 @@ def delete_rows(conn, table, fake, start_dt, end_dt, full_refresh):
     n_rows = random.randint(1, 5) + int(total * DELETE_FRACTION)
     ids = fetch_random_ids(conn, table, n_rows)
 
-    if ids:
-        rows = [(fake.date_time_between(start_date=start_dt, end_date=end_dt), row_id)
-                for row_id in ids]
-        sql = f"UPDATE raw.{table} SET deleted_at = ? WHERE {table}_id = ?;"
-        conn.executemany(sql, rows)
+    rows = []
+    for id in ids:
+        deleted_at = fake.date_time_between(start_date=start_dt, end_date=end_dt)
+        updated_at = deleted_at
+        rows.append((updated_at, deleted_at, id))
+
+    sql = f"UPDATE raw.{table} SET updated_at = ?, deleted_at = ? WHERE {table}_id = ?;"
+    conn.executemany(sql, rows)
 
     print(f"Deleted {len(ids)} rows in {table}.")
     return len(ids)
