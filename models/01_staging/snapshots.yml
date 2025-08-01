@@ -6,6 +6,7 @@ snapshots:
       strategy: timestamp
       unique_key: user_id
       updated_at: updated_at
+      dbt_valid_to: '9999-12-31'
 
   - name: raw__post_snapshots
     relation: source('raw', 'post')
@@ -14,3 +15,4 @@ snapshots:
       strategy: timestamp
       unique_key: post_id
       updated_at: updated_at
+      dbt_valid_to: '9999-12-31'
