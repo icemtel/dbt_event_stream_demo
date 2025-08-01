@@ -1,0 +1,16 @@
+snapshots:
+  - name: dim_users_snapshots
+    relation: ref('dim_users')
+    config:
+      target_schema: snapshots
+      strategy: timestamp
+      unique_key: user_id
+      updated_at: updated_at
+
+  - name: dim_posts_snapshots
+    relation: ref('dim_posts')
+    config:
+      target_schema: snapshots
+      strategy: timestamp
+      unique_key: post_id
+      updated_at: updated_at
