@@ -1,5 +1,5 @@
 snapshots:
-  - name: raw__users
+  - name: raw__post_snapshot
     description: "Type 2 SCD of the raw.user table"
     relation: source('raw', 'user')
     config:
@@ -7,7 +7,8 @@ snapshots:
       strategy: timestamp
       unique_key: user_id
       updated_at: updated_at
-  - name: raw__posts
+
+  - name: raw__post_snapshot
     description: "Type 2 SCD of the raw.post table"
     relation: source('raw', 'post')
     config:
