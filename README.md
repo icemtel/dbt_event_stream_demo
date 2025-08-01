@@ -50,3 +50,4 @@ It only exposes `raw_events`
 Snapshot without metric count.
 MAYBE: keep deleted records (can be filtered on the BI layer, e.g. using Metabase Models)
 
+Verify correctness using tests & ad hoc jupyter notebooks
