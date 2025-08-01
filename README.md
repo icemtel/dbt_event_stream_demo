@@ -3,9 +3,11 @@
 This is a mock dbt project with a goal of building a dimensional model for event stream data.
 Raw data is transformed with a dbt pipeline to implement a star schema with SCD2 dim tables.
 
-Mock events data is generated using `ingest_mock_data.py`. 
-Running this script once creates the DuckDB file, and creates some data for day 1, 
-running it again generates data for day 2, and so on.
+- Mock raw data is generated using `ingest_mock_data.py`. 
+  Running this script once creates the DuckDB file, and creates some data for day 1, 
+  running it again generates data for day 2, and so on.
+- Data represents events and relations on a simple social-network platform (users, posts, events [views, likes]).
+
 
 Script `./ingest_and_dbt_build.sh` runs the ingestion job, followed by `dbt build`.
 
