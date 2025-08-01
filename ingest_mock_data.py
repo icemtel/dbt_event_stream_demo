@@ -6,15 +6,15 @@ import duckdb
 from faker import Faker
 
 DB_FILE = 'event_stream_demo.duckdb'
-UPDATE_FRACTION = 0.05  # fraction of records to update
-DELETE_FRACTION = 0.01  # fraction of records to delete
+UPDATE_FRACTION = 0.05  # fraction of users & posts that get updated each day (= each run)
+DELETE_FRACTION = 0.01  # fraction of users & posts that get deleted each day
 ACTIVE_FRACTION = 0.05  # fraction of users that views posts each day
 MAX_EVENTS_PER_USER = 10 # max views per user each day
 LIKE_RATIO = 0.1
 
 def parse_args():
     parser = argparse.ArgumentParser(
-        description='Generate and ingest mock data into DuckDB event_stream_demo.duckdb')
+        description=f'Generate and ingest mock data into DuckDB {DB_FILE}')
     parser.add_argument(
         '--full-refresh', action='store_true',
         help='Overwrite database file before ingesting')
