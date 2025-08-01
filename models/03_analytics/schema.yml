@@ -29,17 +29,17 @@ models:
         tests:
           - not_null
           - unique
-      - name: author_user_id
+      - name: creator_id
         tests:
           - not_null
           # fk relationship test would fail because soft-deleted rows are removed
-      - name: author_country_code
+      - name: creator_country_code
         tests:
           - not_null
-      - name: author_country
+      - name: creator_country
         tests:
           - not_null
-      - name: author_region
+      - name: creator_region
         tests:
           - not_null
       - name: created_at

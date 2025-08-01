@@ -9,7 +9,7 @@ This is a mock dbt project with a goal of building a dimensional model for event
 
 Metrics:
 - posts: views, likes, ratio
-- authors: total views, total likes, ratio, is_active? slices
+- creators: total views, total likes, ratio, is_active? slices
 - viewers: sessions, activity
 
 
@@ -31,15 +31,18 @@ A: keep on the user, create a new row whenever there is new activity (metrics ch
 B: keep a separate table with metrics
 
 
-## Data Testing
 
-SCD2
-- continuous?
+## Design choices
 
-Test my data assumptions:
-- deleted users do not generate events
-- there are no new events on deleted posts
-- etc..
+SCD2 on source tables (users, posts) using dbt snapshots:
+1. we'll likeky need those audit & compliance.
+2. In case some downstream models are broken, we'll be able to recreate everything.
+
+SCD2 on analytics dimensions to calculate advanced metrics that require knowledge of past states.
+
+For most analyses, daily-grain event tables should suffice, but 
+for advanced queries, event-grain fact table `fct_events` is also exposed to the analytics layer.
+It only exposes `raw_events` 
 
 
 ## Setup
