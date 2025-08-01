@@ -7,6 +7,7 @@ snapshots:
       unique_key: user_id
       updated_at: updated_at
       dbt_valid_to: '9999-12-31'
+      hard_deletes: new_record
 
   - name: dim_posts_snapshots
     relation: ref('dim_posts')
@@ -16,3 +17,4 @@ snapshots:
       unique_key: post_id
       updated_at: updated_at
       dbt_valid_to: '9999-12-31'
+      hard_deletes: new_record
