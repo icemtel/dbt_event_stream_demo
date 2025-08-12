@@ -23,15 +23,12 @@ select creator_id as user_id, sum(likes) as total_likes, sum(views) as total_vie
 
 SELECT u.* exclude(deleted_at),
        -- metrics
-       likes_given,
-       posts_viewed,
+       coalesce(likes_given, 0) as likes_given,
+       coalesce(posts_viewed, 0) as posts_viewed,
         -- creator metrics
-        total_likes,
-        total_views
+        coalesce(total_likes, 0) as total_likes,
+        coalesce(total_views, 0) as total_views
 FROM u
 LEFT JOIN user_totals using (user_id)
 LEFT JOIN creator_totals using (user_id)
 where deleted_at is null
--- Soft-deletes are removed to simplify analyst queries
--- Not removed earlier for a proper join with posts in the intermediate layer
--- (posts are kept on the platform even if the creator is deleted unless they request that)

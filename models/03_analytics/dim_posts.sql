@@ -15,10 +15,10 @@ group by post_id
 
 SELECT p.* exclude(deleted_at),
         -- metrics
-        likes,
-        views
+        coalesce(likes, 0) as likes,
+        coalesce(views, 0) as views
 FROM p
 LEFT join post_totals using (post_id)
 
 
-where deleted_at is null -- see comment in dim_users.sql
+where deleted_at is null
