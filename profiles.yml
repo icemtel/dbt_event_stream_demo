@@ -5,3 +5,4 @@ event_stream_demo:
       type: duckdb
       path: 'event_stream_demo.duckdb'
       threads: 8
+      schema: dev
