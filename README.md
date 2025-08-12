@@ -39,9 +39,14 @@ Metrics:
 
 ### Layers
 
-staging: standardize column names and values; the structure mirrors source systems
-intermediate: clean the data, Models business entities
-analytics ("core", "golden"): dimensions & facts, business-defined metrics.
+staging:
+- standardize column names and values; the structure mirrors source systems
+intermediate:
+-  introduce facts & dimensions that represent business entities
+analytics ("core", "golden"):
+- data is pre-aggregated and summarized with business-defined metrics 
+- this way everyone uses the same metrics
+
 ### Snapshots of source tables (users, posts):
 
 Why?
@@ -80,5 +85,7 @@ Indeed, metric counts are expected to change more frequently than the user attri
   (we assume posts are kept on the platform even if the creator is deleted unless they request that)
  
 # TODO
+
+post creator attributes (country, etc) should use user attributes on the date of post creation ?
 
 Verify correctness using tests & ad hoc jupyter notebooks
