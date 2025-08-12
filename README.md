@@ -37,15 +37,32 @@ Metrics:
 
 ## Data pipeline design choices
 
-SCD2 on source tables (users, posts) using dbt snapshots:
-1. we'll likeky need those audit & compliance.
-2. In case dbt run fails on downstream models, this snapshot will be run first and so we'll know the changes on that day.
+### Snapshots of source tables (users, posts):
 
+Why?
+- Attribute events to correct cohorts (e.g. country) even if that attribute changes.
+- These are slowly changing dimensions, so costs of snapshots are low relative to the events volume.
+- Even if there are no questions that need history of changes yet, they may appear in the future. 
+  => the first order of business is to start snapshotting, and later there will be time to optimize the costs.
+
+How?
+- SCD2 - industry standard
+- we can make a snapshot independent of the success/failure of the downstream pipeline, making sure we don't miss source changes.
+- Using dbt snapshots: simple to implement, does the job
+
+## Snapshots of mart tables 
+
+SCD2 on source tables (users, posts) using dbt snapshots:
 SCD2 on analytics dimensions to calculate advanced metrics that require knowledge of past states.
 
 For most analyses, daily-grain event tables should suffice, but 
 for advanced queries, event-grain fact table `fct_events` is also exposed to the analytics layer.
 It only exposes `raw_events` 
+
+
+## mart dimensions
+
+TODO: soft deletes are not kept?
 
 # TODO
 
