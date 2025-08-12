@@ -1,7 +1,7 @@
 # event_stream_demo
 
 This is a mock dbt project with a goal of building a dimensional model for event stream data.
-Raw data is transformed with a dbt pipeline to implement a star schema with SCD2 dim tables.
+Raw data is transformed with a dbt pipeline to implement a star schema with SCD2 dim tables (Kimball).
 
 - Mock raw data is generated using `ingest_mock_data.py`. 
   Running this script once creates the DuckDB file, and creates some data for day 1, 
@@ -37,6 +37,11 @@ Metrics:
 
 ## Data pipeline design choices
 
+### Layers
+
+staging: standardize column names and values; the structure mirrors source systems
+intermediate: clean the data, Models business entities
+analytics ("core", "golden"): dimensions & facts, business-defined metrics.
 ### Snapshots of source tables (users, posts):
 
 Why?
@@ -50,23 +55,30 @@ How?
 - we can make a snapshot independent of the success/failure of the downstream pipeline, making sure we don't miss source changes.
 - Using dbt snapshots: simple to implement, does the job
 
-## Snapshots of mart tables 
 
-SCD2 on source tables (users, posts) using dbt snapshots:
-SCD2 on analytics dimensions to calculate advanced metrics that require knowledge of past states.
+## Facts
 
 For most analyses, daily-grain event tables should suffice, but 
 for advanced queries, event-grain fact table `fct_events` is also exposed to the analytics layer.
 It only exposes `raw_events` 
 
+## Dimensions 
 
-## mart dimensions
+### Snapshots
 
-TODO: soft deletes are not kept?
+SCD2 on analytics dimensions to calculate advanced metrics that require knowledge of past states.
 
+dbt snapshot is using `updated_at` column, so that if only the metric count is updated,
+it won' trigger a snapshot.
+Indeed, metric counts are expected to change more frequently than the user attributes.
+
+
+### Current
+
+- Soft-deletes are removed to simplify analyst queries
+- Not removed earlier for a proper join with posts in the intermediate layer
+  (we assume posts are kept on the platform even if the creator is deleted unless they request that)
+ 
 # TODO
-
-Snapshot without metric count.
-MAYBE: keep deleted records (can be filtered on the BI layer, e.g. using Metabase Models)
 
 Verify correctness using tests & ad hoc jupyter notebooks
