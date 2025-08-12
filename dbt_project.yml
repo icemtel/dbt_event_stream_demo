@@ -27,6 +27,9 @@ models:
       +schema: analytics
 
 
+vars:
+  snapshot_end_timestamp: "TIMESTAMP '9999-12-31 00:00:00'"
+
 seed-paths: ['seeds']
 seeds:
   event_stream_demo:
