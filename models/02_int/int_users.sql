@@ -19,10 +19,10 @@ select
     full_name,
 
     -- cohort attributes
-    country_code,
-    country,
-    region,
-    fav_color,
+    coalesce(country_code, 'Unknown') as country_code,
+    coalesce(country, 'Unknown') as country,
+    coalesce(region, 'Unknown') as region,
+    coalesce(fav_color, 'Unknown') as fav_color,
 
     -- timestamps
     created_at,
