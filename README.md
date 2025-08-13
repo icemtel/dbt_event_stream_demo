@@ -28,6 +28,8 @@ Metrics:
 - creators: total views, total likes, ratio, is_active? slices
 - viewers: sessions, activity (TBD)
 
+See also `analyses` folder.
+
 ## Out of Scope
 
 - Event deduplication - assume that this is handled upstream
