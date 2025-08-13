@@ -88,6 +88,9 @@ Indeed, metric counts are expected to change more frequently than the user attri
  
 # TODO
 
+
+fix snapshots strategy (currently, dbt_valid_to = updated_at even for new records)
+
 post creator attributes (country, etc) should use user attributes on the date of post creation ?
 
 Verify correctness using tests & ad hoc jupyter notebooks
